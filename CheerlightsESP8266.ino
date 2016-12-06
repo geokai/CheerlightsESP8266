@@ -1,6 +1,6 @@
 /* Cheerlights on the ESP8266, tested on Wemos D1 mini V2.
    Russ Winch - December 2016
-   *********add github link
+   https://github.com/russwinch/CheerlightsESP8266
 
    Based on the ESP8226 WifiClient example and Adafruit Neopixels examples
    Using a code snippet to identify the hex value from bbx10: https://github.com/bbx10/esp-cheer-lights/blob/master/esp-cheer-lights/esp-cheer-lights.ino
