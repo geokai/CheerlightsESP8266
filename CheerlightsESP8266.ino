@@ -2,23 +2,10 @@
    Russ Winch - December 2016
    https://github.com/russwinch/CheerlightsESP8266
 
-   Based on the ESP8226 WifiClient example and Adafruit Neopixels examples
-   Using a code snippet to identify the hex value from bbx10: https://github.com/bbx10/esp-cheer-lights/blob/master/esp-cheer-lights/esp-cheer-lights.ino
-   Implementation of the suggested delay for slow connections from Frogmore42: https://github.com/esp8266/Arduino/issues/722
-
-  The Colors of CheerLights
-    red (#FF0000)
-    green (#008000)
-    blue (#0000FF)
-    cyan (#00FFFF)
-    white (#FFFFFF)
-    oldlace / warmwhite (#FDF5E6)
-    purple (#800080)
-    magenta (#FF00FF)
-    yellow (#FFFF00)
-    orange (#FFA500)
-    pink (#FFC0CB)
-
+   - Based on the ESP8226 WifiClient example and Adafruit Neopixels examples
+   - Using a code snippet to identify the hex value from bbx10: https://github.com/bbx10/esp-cheer-lights/blob/master/esp-cheer-lights/esp-cheer-lights.ino
+   - Implementation of the suggested delay for slow connections from Frogmore42: https://github.com/esp8266/Arduino/issues/722
+   - Cheerlights API documentation: http://cheerlights.com/cheerlights-api/
 */
 
 #include <ESP8266WiFi.h>
@@ -28,7 +15,7 @@
 #define PIN D3
 
 // How many NeoPixels are attached to the Arduino?
-#define NUMPIXELS 1
+#define NUMPIXELS 4
 
 // When we setup the NeoPixel library, we tell it how many pixels, and which pin to use to send signals.
 // Note that for older NeoPixel strips you might need to change the third parameter--see the strandtest
@@ -41,40 +28,30 @@ Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ80
 // on a live circuit...if you must, connect GND first.
 
 // Wifi settings
-const char ssid[]     = "aaaaaaaaaaaa";
-const char password[] = "bbbbbbbbbbbb";
+const char ssid[]     = "aaaaaaaaaaa";
+const char password[] = "bbbbbbbbbbb";
 
 // Location of the Cheerlights API
 const char host[] = "api.thingspeak.com";
 const int httpPort = 80;
 
-// Delay between updates (in miliseconds). 5-10 seconds recommended
-int wait = 5000;
+// Delay between updates (in miliseconds). 5+ seconds recommended
+int wait = 10 * 1000;
 
-int RGB[3]; //current value of leds
-int targetRGB[3]; //target value of leds
-boolean online; //mode selector
-//possible cheerlights colours
+//cheerlights colours for offline mode
 unsigned long colours[11] = {0xFF0000, 0x008000, 0x0000FF, 0x00FFFF, 0xFFFFFF, 0xFDF5E6, 0x800080, 0xFF00FF, 0xFFFF00, 0xFFA500, 0xFFC0CB};
 int offlineCol; //offline selected colour
+boolean online; //mode selector
+int RGB[3]; //current value of leds
+int targetRGB[3]; //target value of leds
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(9600);
   pixels.begin(); // This initializes the NeoPixel library.
   randomSeed(analogRead(A0)); //initialise random seed on analog pin 0
-  WiFi.begin(ssid, password); //connect to wifi
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-    if (millis() > 60000) { //give up if not connected after 60 seconds
-      online = false; //offline mode
-      confirm(false);
-      return;
-    }
-  }
-  online = true; //online mode
-  confirm(true); //confirm wifi is connected
+  online = connectWifi(); //connect to Wifi and store result in online variable
+  confirm(online); //confirm wifi connection
 }
 
 void loop() {
@@ -82,17 +59,36 @@ void loop() {
     getColour();
     while (!compare(RGB, targetRGB)) updateColour(); //while we are out of sync with cheerlights
     delay(wait); //wait between updates
-  }
-  else {
+  } else {
     offlineColour();
-    //    Serial.println(c);
     while (!compare(RGB, targetRGB)) updateColour(); //while we are out of sync with cheerlights
-    int randDelay = random(1, 10); //random number of minutes to wait between updates
+    int randDelay = random(5); //random number of minutes to wait between updates
     Serial.print("Waiting for ");
     Serial.print(randDelay);
     Serial.println(" mins");
     delay(randDelay * 60000); //convert to milliseconds
   }
+  if (WiFi.status() != WL_CONNECTED) online = connectWifi(); //if connection is dropped, attempt to re-connect or go into offline mode
+}
+
+bool connectWifi() {
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+  
+  int attempts = 0;
+  WiFi.begin(ssid, password); //connect to wifi
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print(".");
+    delay(1000);
+    attempts++;
+    if (attempts >= 30) return false; //give up if not connected after 30 seconds
+  }
+  Serial.println();
+  Serial.println("WiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  return true;
 }
 
 void getColour() {
@@ -130,8 +126,7 @@ void getColour() {
         delay(10);
         digitalWrite(LED_BUILTIN, HIGH);
       }
-    }
-    else {
+    } else {
       Serial.print("."); //waiting for response
       delay(100);
     }
@@ -153,7 +148,7 @@ void decodeHex(unsigned long h, int *out) {
 
 void updateColour() {
   for (int i = 0; i < 3; i++) { //loop through red, green, blue
-    if (RGB[i] < targetRGB[i]) RGB[i]++; //increase if below targer
+    if (RGB[i] < targetRGB[i]) RGB[i]++; //increase if below target
     else if (RGB[i] > targetRGB[i]) RGB[i]--; //decrease if above target
   }
   writeColour(RGB[0], RGB[1], RGB[2]);
